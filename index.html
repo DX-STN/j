@@ -252,7 +252,7 @@ function update(){
  navBox.style.height = nH + 'px';
 }
 */
-
+/*
 function update() {
   if (!img.isLoaded) return;
 
@@ -333,6 +333,106 @@ function update() {
   viewBox.style.width = (vW * ns) + 'px';
   viewBox.style.height = (vH * ns) + 'px';
 }
+*/
+
+ function update() {
+  if (!img.isLoaded) return;
+
+  // 1. メインキャンバスの画像配置
+  mainImg.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
+
+  // 2. メインキャンバス上の選択枠（青枠）
+  const L = view.x + sel.x * view.scale;
+  const T = view.y + sel.y * view.scale;
+  const W = sel.w * view.scale;
+  const H = sel.h * view.scale;
+
+  cropBox.style.left = L + 'px';
+  cropBox.style.top = T + 'px';
+  cropBox.style.width = W + 'px';
+  cropBox.style.height = H + 'px';
+
+  // 3. 操作ハンドルの配置と z-index の動的調整
+  const pad = 50;
+  
+  // 基本位置の設定
+  hn.style.left = (L + 5) + 'px';
+  hn.style.top = (T - pad) + 'px';
+  hn.style.width = (W - 10) + 'px';
+
+  hs.style.left = (L + 5) + 'px';
+  hs.style.top = (T + H - pad) + 'px';
+  hs.style.width = (W - 10) + 'px';
+
+  hw.style.left = (L - pad) + 'px';
+  hw.style.top = (T + 5) + 'px';
+  hw.style.height = (H - 10) + 'px';
+
+  he.style.left = (L + W - pad) + 'px';
+  he.style.top = (T + 5) + 'px';
+  he.style.height = (H - 10) + 'px';
+
+  // --- z-index 優先順位ロジック ---
+  // ❶ 外側 (枠の座標より外にある判定) を最優先
+  // ❷ 内側の短辺 を次に優先
+  // ❸ 内側の長辺 を最後に設定
+  
+  // 外側の判定を 10、内側を 5 または 1 とします
+  const isHorizontalLong = sel.w > sel.h;
+
+  if (isHorizontalLong) {
+    // 横が長い場合：短辺は w(西)・e(東)、長辺は n(北)・s(南)
+    hw.style.zIndex = 10; // ❶外側・❷短辺
+    he.style.zIndex = 10; // ❶外側・❷短辺
+    hn.style.zIndex = 5;  // ❸長辺
+    hs.style.zIndex = 5;  // ❸長辺
+  } else {
+    // 縦が長い（または正方形）場合：短辺は n(北)・s(南)、長辺は w(西)・e(東)
+    hn.style.zIndex = 10; // ❶外側・❷短辺
+    hs.style.zIndex = 10; // ❶外側・❷短辺
+    hw.style.zIndex = 5;  // ❸長辺
+    he.style.zIndex = 5;  // ❸長辺
+  }
+
+  // 4. ナビキャンバスの計算
+  const nr = nCont.getBoundingClientRect();
+  const mr = mCont.getBoundingClientRect();
+  const ns = Math.min(nr.width / img.w, nr.height / img.h);
+  const nx = (nr.width - img.w * ns) / 2;
+  const ny = (nr.height - img.h * ns) / 2;
+
+  navImg.style.transform = `translate(${nx}px,${ny}px) scale(${ns})`;
+
+  // 5. ナビ内のピクセル選択枠（青枠同期）
+  navBox.style.border = "2px solid #4da3ff";
+  navBox.style.background = "none";
+  navBox.style.left = (nx + sel.x * ns) + 'px';
+  navBox.style.top = (ny + sel.y * ns) + 'px';
+  navBox.style.width = (sel.w * ns) + 'px';
+  navBox.style.height = (sel.h * ns) + 'px';
+
+  // 6. ナビ内のキャンバス表示領域（薄青マスク）
+  let viewBox = document.getElementById('view-box');
+  if (!viewBox) {
+    viewBox = document.createElement('div');
+    viewBox.id = 'view-box';
+    viewBox.style.position = 'absolute';
+    viewBox.style.pointerEvents = 'none';
+    viewBox.style.boxShadow = '0 0 0 4000px rgba(77, 163, 255, 0.3)';
+    nCont.appendChild(viewBox);
+  }
+
+  const vL = (0 - view.x) / view.scale;
+  const vT = (0 - view.y) / view.scale;
+  const vW = mr.width / view.scale;
+  const vH = mr.height / view.scale;
+
+  viewBox.style.left = (nx + vL * ns) + 'px';
+  viewBox.style.top = (ny + vT * ns) + 'px';
+  viewBox.style.width = (vW * ns) + 'px';
+  viewBox.style.height = (vH * ns) + 'px';
+}
+
 
 
  
