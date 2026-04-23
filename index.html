@@ -349,7 +349,7 @@ function update() {
   viewBox.style.height = (vH * ns) + 'px';
 }
 */
-
+/*
  function update() {
   if (!img.isLoaded) return;
 
@@ -447,7 +447,101 @@ function update() {
   viewBox.style.width = (vW * ns) + 'px';
   viewBox.style.height = (vH * ns) + 'px';
 }
+*/
 
+
+ function update() {
+  if (!img.isLoaded) return;
+
+  // 1. メインキャンバス画像
+  mainImg.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
+
+  // 2. 選択枠（青枠）
+  const L = view.x + sel.x * view.scale;
+  const T = view.y + sel.y * view.scale;
+  const W = sel.w * view.scale;
+  const H = sel.h * view.scale;
+
+  cropBox.style.left = L + 'px';
+  cropBox.style.top = T + 'px';
+  cropBox.style.width = W + 'px';
+  cropBox.style.height = H + 'px';
+
+  // 3. ハンドル配置と z-index 制御
+  const pad = 50; // 反応領域の厚み
+  const isHorizontalLong = sel.w > sel.h;
+
+  const edges = ['n', 's', 'e', 'w'];
+  edges.forEach(edge => {
+    const o = document.getElementById(`h${edge}_o`); // 外側
+    const i = document.getElementById(`h${edge}_i`); // 内側
+
+    // 位置計算（外側は枠から外へ、内側は枠から内へ配置）
+    if (edge === 'n' || edge === 's') {
+      const topBase = (edge === 'n') ? T : T + H;
+      o.style.top = (topBase - pad) + 'px';
+      i.style.top = topBase + 'px';
+      o.style.left = i.style.left = (L + 5) + 'px';
+      o.style.width = i.style.width = (W - 10) + 'px';
+      o.style.height = i.style.height = pad + 'px';
+    } else {
+      const leftBase = (edge === 'w') ? L : L + W;
+      o.style.left = (leftBase - pad) + 'px';
+      i.style.left = leftBase + 'px';
+      o.style.top = i.style.top = (T + 5) + 'px';
+      o.style.width = i.style.width = pad + 'px';
+      o.style.height = i.style.height = (H - 10) + 'px';
+    }
+
+    // z-index 割り当て
+    // ❶ 外側(_o) は常に最前面 (15)
+    o.style.zIndex = 15;
+
+    // ❷/❸ 内側(_i) は短辺を優先
+    if (isHorizontalLong) {
+      // 横長なら東西(e/w)が短辺
+      i.style.zIndex = (edge === 'e' || edge === 'w') ? 10 : 5;
+    } else {
+      // 縦長なら南北(n/s)が短辺
+      i.style.zIndex = (edge === 'n' || edge === 's') ? 10 : 5;
+    }
+  });
+
+  // 4. ナビキャンバス
+  const nr = nCont.getBoundingClientRect();
+  const mr = mCont.getBoundingClientRect();
+  const ns = Math.min(nr.width / img.w, nr.height / img.h);
+  const nx = (nr.width - img.w * ns) / 2;
+  const ny = (nr.height - img.h * ns) / 2;
+  navImg.style.transform = `translate(${nx}px,${ny}px) scale(${ns})`;
+
+  // 5. ナビ内の青枠
+  navBox.style.border = "2px solid #4da3ff";
+  navBox.style.background = "none";
+  navBox.style.left = (nx + sel.x * ns) + 'px';
+  navBox.style.top = (ny + sel.y * ns) + 'px';
+  navBox.style.width = (sel.w * ns) + 'px';
+  navBox.style.height = (sel.h * ns) + 'px';
+
+  // 6. ナビ内のキャンバス位置（透過穴）
+  let viewBox = document.getElementById('view-box');
+  if (!viewBox) {
+    viewBox = document.createElement('div');
+    viewBox.id = 'view-box';
+    viewBox.style.position = 'absolute';
+    viewBox.style.pointerEvents = 'none';
+    viewBox.style.boxShadow = '0 0 0 4000px rgba(77, 163, 255, 0.3)';
+    nCont.appendChild(viewBox);
+  }
+  const vL = (0 - view.x) / view.scale;
+  const vT = (0 - view.y) / view.scale;
+  const vW = mr.width / view.scale;
+  const vH = mr.height / view.scale;
+  viewBox.style.left = (nx + vL * ns) + 'px';
+  viewBox.style.top = (ny + vT * ns) + 'px';
+  viewBox.style.width = (vW * ns) + 'px';
+  viewBox.style.height = (vH * ns) + 'px';
+}
 
 
  
