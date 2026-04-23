@@ -196,7 +196,7 @@ function fit(){
  view.y=(r.height/2)-(sel.y+sel.h/2)*view.scale;
  update();
 }
-
+/*
 function update(){
  if(!img.isLoaded)return;
 
@@ -251,6 +251,91 @@ function update(){
  navBox.style.width  = nW + 'px';
  navBox.style.height = nH + 'px';
 }
+*/
+
+function update() {
+  if (!img.isLoaded) return;
+
+  // 1. メインキャンバスの画像配置
+  mainImg.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
+
+  // 2. メインキャンバス上の選択枠（青枠）
+  // ビットマップ上の sel 座標から画面上の表示位置を計算
+  const L = view.x + sel.x * view.scale;
+  const T = view.y + sel.y * view.scale;
+  const W = sel.w * view.scale;
+  const H = sel.h * view.scale;
+
+  cropBox.style.left = L + 'px';
+  cropBox.style.top = T + 'px';
+  cropBox.style.width = W + 'px';
+  cropBox.style.height = H + 'px';
+
+  // 3. 操作ハンドルの配置
+  const pad = 50;
+  hn.style.left = (L + 5) + 'px';
+  hn.style.top = (T - pad) + 'px';
+  hn.style.width = (W - 10) + 'px';
+
+  hs.style.left = (L + 5) + 'px';
+  hs.style.top = (T + H - pad) + 'px';
+  hs.style.width = (W - 10) + 'px';
+
+  hw.style.left = (L - pad) + 'px';
+  hw.style.top = (T + 5) + 'px';
+  hw.style.height = (H - 10) + 'px';
+
+  he.style.left = (L + W - pad) + 'px';
+  he.style.top = (T + 5) + 'px';
+  he.style.height = (H - 10) + 'px';
+
+  // 4. ナビキャンバスの計算
+  const nr = nCont.getBoundingClientRect();
+  const mr = mCont.getBoundingClientRect();
+  
+  // 画像全体をナビ枠に収めるスケール
+  const ns = Math.min(nr.width / img.w, nr.height / img.h);
+  const nx = (nr.width - img.w * ns) / 2;
+  const ny = (nr.height - img.h * ns) / 2;
+
+  navImg.style.transform = `translate(${nx}px,${ny}px) scale(${ns})`;
+
+  // 5. ナビ内のピクセル選択枠（メインの青枠と同期）
+  navBox.style.border = "2px solid #4da3ff"; // 青枠と同じ色
+  navBox.style.background = "none";           // 赤い塗りを削除
+  navBox.style.left = (nx + sel.x * ns) + 'px';
+  navBox.style.top = (ny + sel.y * ns) + 'px';
+  navBox.style.width = (sel.w * ns) + 'px';
+  navBox.style.height = (sel.h * ns) + 'px';
+
+  // 6. ナビ内の「キャンバス表示領域」可視化（逆算）
+  let viewBox = document.getElementById('view-box');
+  if (!viewBox) {
+    viewBox = document.createElement('div');
+    viewBox.id = 'view-box';
+    viewBox.style.position = 'absolute';
+    viewBox.style.pointerEvents = 'none';
+    viewBox.style.overflow = 'hidden';
+    // 外側を薄い青色で塗る（内側を透明にするための巨大な影）
+    viewBox.style.boxShadow = '0 0 0 4000px rgba(77, 163, 255, 0.3)';
+    nCont.appendChild(viewBox);
+  }
+
+  // メインキャンバスで見えている画像ピクセル範囲を計算
+  const vL = (0 - view.x) / view.scale;
+  const vT = (0 - view.y) / view.scale;
+  const vW = mr.width / view.scale;
+  const vH = mr.height / view.scale;
+
+  // ナビのスケールに合わせて配置
+  viewBox.style.left = (nx + vL * ns) + 'px';
+  viewBox.style.top = (ny + vT * ns) + 'px';
+  viewBox.style.width = (vW * ns) + 'px';
+  viewBox.style.height = (vH * ns) + 'px';
+}
+
+
+ 
 </script>
 
 </body>
