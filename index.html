@@ -178,7 +178,7 @@ function update() {
 }
 */
 
-
+/*
 const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img');
 const navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box');
 const mCont = document.getElementById('main-container'), nCont = document.getElementById('nav-container');
@@ -321,7 +321,132 @@ function update() {
   vBox.style.left = (nx + vL * ns) + 'px'; vBox.style.top = (ny + vT * ns) + 'px';
   vBox.style.width = (vW * ns) + 'px'; vBox.style.height = (vH * ns) + 'px';
 }
+*/
 
+
+ const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img');
+const navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box');
+const mCont = document.getElementById('main-container'), nCont = document.getElementById('nav-container');
+const fileInput = document.getElementById('file-input');
+
+let img={w:0,h:0,isLoaded:false}, view={x:0,y:0,scale:1}, sel={x:0,y:0,w:0,h:0};
+let touch={mode:'',lastX:0,lastY:0,edge:''};
+
+fileInput.onchange = e=>{
+ const f=e.target.files; if(!f)return;
+ const r=new FileReader();
+ r.onload=ev=>{
+  navImg.src=mainImg.src=ev.target.result;
+  mainImg.onload=()=>{
+   img.w=mainImg.naturalWidth; img.h=mainImg.naturalHeight; img.isLoaded=true;
+   sel={x:0,y:0,w:img.w,h:img.h};
+   mainImg.style.display=navImg.style.display=cropBox.style.display=navBox.style.display='block';
+   update();
+  };
+ };
+ r.readAsDataURL(f);
+};
+
+mCont.addEventListener('touchstart',e=>{
+ if(!img.isLoaded)return;
+ const t=e.touches;
+ touch.mode = e.target.classList.contains('handle') ? 'edit' : 'scroll';
+ if(touch.mode==='edit') touch.edge=e.target.dataset.edge;
+ touch.lastX=t.pageX; touch.lastY=t.pageY;
+},{passive:false});
+
+mCont.addEventListener('touchmove',e=>{
+ if(!touch.mode)return; e.preventDefault();
+ const t=e.touches;
+ let dx=(t.pageX-touch.lastX)/view.scale, dy=(t.pageY-touch.lastY)/view.scale;
+
+ if(touch.mode==='scroll'){
+  view.x+=t.pageX-touch.lastX; view.y+=t.pageY-touch.lastY;
+ }
+ if(touch.mode==='edit'){
+  const min=1;
+  if(touch.edge==='n'){ dy=Math.min(dy,sel.h-min); sel.y+=dy; sel.h-=dy; }
+  if(touch.edge==='s'){ sel.h=Math.max(min,sel.h+dy); }
+  if(touch.edge==='e'){ sel.w=Math.max(min,sel.w+dx); }
+  if(touch.edge==='w'){ dx=Math.min(dx,sel.w-min); sel.x+=dx; sel.w-=dx; }
+  sel.x=Math.max(0,Math.min(sel.x,img.w-sel.w)); sel.y=Math.max(0,Math.min(sel.y,img.h-sel.h));
+ }
+ touch.lastX=t.pageX; touch.lastY=t.pageY;
+ update();
+},{passive:false});
+
+mCont.addEventListener('touchend',()=>{
+ if(touch.mode==='edit'){ sel.x=Math.round(sel.x); sel.y=Math.round(sel.y); sel.w=Math.round(sel.w); sel.h=Math.round(sel.h); }
+ touch.mode=''; update();
+});
+
+function update() {
+  if (!img.isLoaded) return;
+  const mr = mCont.getBoundingClientRect();
+  
+  // 1. スケール計算：キャンバスの境界（100%）にピタッと合わせる
+  const maxPixelSize = 40; // 1px=1cm
+  let s = Math.min(mr.width / sel.w, mr.height / sel.h);
+  
+  // 最大拡大上限（40px）を適用
+  view.scale = Math.min(s, maxPixelSize);
+  
+  // 画像全体が表示される最小スケールを保証
+  const minS = Math.min(mr.width / img.w, mr.height / img.h);
+  if(view.scale < minS) view.scale = minS;
+
+  // 2. 選択範囲の中心をキャンバス中央へ固定（オートセンター）
+  view.x = (mr.width / 2) - (sel.x + sel.w / 2) * view.scale;
+  view.y = (mr.height / 2) - (sel.y + sel.h / 2) * view.scale;
+
+  mainImg.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
+
+  const L = view.x + sel.x * view.scale, T = view.y + sel.y * view.scale;
+  const W = sel.w * view.scale, H = sel.h * view.scale;
+  
+  // 枠の配置：計算上の端数を考慮しつつ、キャンバスの縁に合わせる
+  cropBox.style.left = L+'px'; cropBox.style.top = T+'px';
+  cropBox.style.width = W+'px'; cropBox.style.height = H+'px';
+
+  // 3. ハンドル配置
+  const pad = 50, dPW = Math.min(pad, W), dPH = Math.min(pad, H), isHL = sel.w > sel.h;
+  ['n', 's', 'e', 'w'].forEach(edge => {
+    const o = document.getElementById(`h${edge}_o`), i = document.getElementById(`h${edge}_i`);
+    if (edge === 'n' || edge === 's') {
+      const b = (edge === 'n') ? T : T + H;
+      o.style.width = W + 'px'; o.style.left = L + 'px'; // 辺全体に広げる
+      o.style.top = (edge === 'n' ? b - pad : b) + 'px'; o.style.height = pad + 'px';
+      i.style.width = W + 'px'; i.style.left = L + 'px';
+      i.style.top = (edge === 'n' ? b : b - dPH) + 'px'; i.style.height = dPH + 'px';
+    } else {
+      const b = (edge === 'w') ? L : L + W;
+      o.style.height = H + 'px'; o.style.top = T + 'px';
+      o.style.left = (edge === 'w' ? b - pad : b) + 'px'; o.style.width = pad + 'px';
+      i.style.height = H + 'px'; i.style.top = T + 'px';
+      i.style.left = (edge === 'w' ? b : b - dPW) + 'px'; i.style.width = dPW + 'px';
+    }
+    o.style.zIndex = 20;
+    i.style.zIndex = isHL ? ((edge === 'e' || edge === 'w') ? 10 : 5) : ((edge === 'n' || edge === 's') ? 10 : 5);
+  });
+
+  // 4. ナビ更新
+  const nr = nCont.getBoundingClientRect();
+  const ns = Math.min(nr.width / img.w, nr.height / img.h);
+  const nx = (nr.width - img.w * ns) / 2, ny = (nr.height - img.h * ns) / 2;
+  navImg.style.transform = `translate(${nx}px,${ny}px) scale(${ns})`;
+  navBox.style.left = (nx + sel.x * ns) + 'px'; navBox.style.top = (ny + sel.y * ns) + 'px';
+  navBox.style.width = (sel.w * ns) + 'px'; navBox.style.height = (sel.h * ns) + 'px';
+
+  let vBox = document.getElementById('view-box');
+  if (!vBox) {
+    vBox = document.createElement('div'); vBox.id = 'view-box';
+    vBox.style.cssText = 'position:absolute;pointer-events:none;box-shadow:0 0 0 4000px rgba(77,163,255,0.3);';
+    nCont.appendChild(vBox);
+  }
+  const vL = -view.x/view.scale, vT = -view.y/view.scale, vW = mr.width/view.scale, vH = mr.height/view.scale;
+  vBox.style.left = (nx + vL * ns) + 'px'; vBox.style.top = (ny + vT * ns) + 'px';
+  vBox.style.width = (vW * ns) + 'px'; vBox.style.height = (vH * ns) + 'px';
+}
 
 
  
