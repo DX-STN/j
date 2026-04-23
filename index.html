@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>FINAL SYNC TRUE - Logic Precise</title>
+<style>
+body { margin:0; background:#111; overflow:hidden; display:flex; flex-direction:column; align-items:center; }
+.canvas { width:90vw; margin:10px 0; background:#222; position:relative; overflow:hidden; touch-action:none; }
+#nav-container { height:30vh; }
+#main-container { height:50vh; background:#333; }
+#main-img,#nav-img {
+ position:absolute; top:0; left:0; transform-origin:0 0;
+ pointer-events:none; display:none; image-rendering:pixelated;
+}
+.crop-box {
+ position:absolute; border:2px solid #4da3ff; box-sizing:border-box;
+ pointer-events:none; display:none; z-index: 2;
+}
+.nav-box {
+ position:absolute; border:2px solid #4da3ff; box-sizing:border-box;
+ pointer-events:none; display:none; z-index: 3;
+}
+.handle { position:absolute; pointer-events:auto; }
+#file-input { margin: 10px; color: white; }
+</style>
+</head>
+<body>
+
+<div id="nav-container" class="canvas">
+ <img id="nav-img">
+ <div id="nav-box" class="nav-box"></div>
+</div>
+
+<div id="main-container" class="canvas">
+ <img id="main-img">
+ <div id="crop-box" class="crop-box"></div>
+ <!-- ❶ 外側ハンドル -->
+ <div id="hn_o" class="handle" data-edge="n"></div>
+ <div id="hs_o" class="handle" data-edge="s"></div>
+ <div id="he_o" class="handle" data-edge="e"></div>
+ <div id="hw_o" class="handle" data-edge="w"></div>
+ <!-- ❷❸ 内側ハンドル -->
+ <div id="hn_i" class="handle" data-edge="n"></div>
+ <div id="hs_i" class="handle" data-edge="s"></div>
+ <div id="he_i" class="handle" data-edge="e"></div>
+ <div id="hw_i" class="handle" data-edge="w"></div>
+</div>
+
+<input type="file" id="file-input" accept="image/*">
+
+<script>
+const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img');
+const navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box');
+const mCont = document.getElementById('main-container'), nCont = document.getElementById('nav-container');
+const fileInput = document.getElementById('file-input');
+
+let img={w:0,h:0,isLoaded:false}, view={x:0,y:0,scale:1}, sel={x:0,y:0,w:0,h:0};
+let touch={mode:'',lastX:0,lastY:0,lastDist:0,lastScale:1,edge:''};
+
+fileInput.onchange = e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const r=new FileReader();
+ r.onload=ev=>{
+  navImg.src=mainImg.src=ev.target.result;
+  mainImg.onload=()=>{
+   img.w=mainImg.naturalWidth; img.h=mainImg.naturalHeight; img.isLoaded=true;
+   const r=mCont.getBoundingClientRect();
+   view.scale=Math.min(r.width/img.w,r.height/img.h);
+   view.x=(r.width-img.w*view.scale)/2; view.y=(r.height-img.h*view.scale)/2;
+   sel={x:0,y:0,w:img.w,h:img.h};
+   mainImg.style.display=navImg.style.display=cropBox.style.display=navBox.style.display='block';
+   update();
+  };
+ };
+ r.readAsDataURL(f);
+};
+
+mCont.addEventListener('touchstart',e=>{
+ if(!img.isLoaded)return;
+ const t=e.touches;
+ if(t.length===2){
+  touch.mode='zoom';
+  touch.lastDist=Math.hypot(t[1].pageX-t[0].pageX,t[1].pageY-t[0].pageY);
+  touch.lastScale=view.scale;
+ }else{
+  touch.mode = e.target.classList.contains('handle') ? 'edit' : 'scroll';
+  if(touch.mode==='edit') touch.edge=e.target.dataset.edge;
+  touch.lastX=t[0].pageX; touch.lastY=t[0].pageY;
+ }
+},{passive:false});
+
+mCont.addEventListener('touchmove',e=>{
+ if(!touch.mode)return; e.preventDefault();
+ const t=e.touches;
+ if(touch.mode==='zoom' && t.length===2){
+  const dist=Math.hypot(t[1].pageX-t[0].pageX,t[1].pageY-t[0].pageY);
+  let scale=Math.max(Math.min(mCont.offsetWidth/img.w, mCont.offsetHeight/img.h), touch.lastScale*(dist/touch.lastDist));
+  const cx=mCont.offsetWidth/2, cy=mCont.offsetHeight/2;
+  view.x=cx-(cx-view.x)*(scale/view.scale); view.y=cy-(cy-view.y)*(scale/view.scale);
+  view.scale=scale;
+ }
+ if(touch.mode==='scroll'){
+  view.x+=t[0].pageX-touch.lastX; view.y+=t[0].pageY-touch.lastY;
+ }
+ if(touch.mode==='edit'){
+  let dx=(t[0].pageX-touch.lastX)/view.scale, dy=(t[0].pageY-touch.lastY)/view.scale;
+  const min=1;
+  if(touch.edge==='n'){ dy=Math.min(dy,sel.h-min); sel.y+=dy; sel.h-=dy; }
+  if(touch.edge==='s'){ sel.h=Math.max(min,sel.h+dy); }
+  if(touch.edge==='e'){ sel.w=Math.max(min,sel.w+dx); }
+  if(touch.edge==='w'){ dx=Math.min(dx,sel.w-min); sel.x+=dx; sel.w-=dx; }
+  sel.x=Math.max(0,Math.min(sel.x,img.w-sel.w)); sel.y=Math.max(0,Math.min(sel.y,img.h-sel.h));
+ }
+ touch.lastX=t[0].pageX; touch.lastY=t[0].pageY;
+ update();
+},{passive:false});
+
+mCont.addEventListener('touchend',()=>{
+ if(touch.mode==='edit'){ sel.x=Math.round(sel.x); sel.y=Math.round(sel.y); sel.w=Math.round(sel.w); sel.h=Math.round(sel.h); update(); }
+ touch.mode='';
+});
+
+function update() {
+  if (!img.isLoaded) return;
+  mainImg.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
+  const L = view.x + sel.x * view.scale, T = view.y + sel.y * view.scale;
+  const W = sel.w * view.scale, H = sel.h * view.scale;
+
+  cropBox.style.left = L+'px'; cropBox.style.top = T+'px';
+  cropBox.style.width = W+'px'; cropBox.style.height = H+'px';
+
+  const pad = 50; 
+  const isHorizontalLong = sel.w > sel.h;
+
+  // 内側ハンドルの厚みを、枠が狭まった時に反対側へ出ないよう制限
+  const dynamicPadW = Math.min(pad, W);
+  const dynamicPadH = Math.min(pad, H);
+
+  ['n', 's', 'e', 'w'].forEach(edge => {
+    const o = document.getElementById(`h${edge}_o`), i = document.getElementById(`h${edge}_i`);
+    if (edge === 'n' || edge === 's') {
+      const topBase = (edge === 'n') ? T : T + H;
+      // 外側：角(pad四方)を空ける。かつ短くなりすぎないよう調整
+      const oWidth = Math.max(0, W - pad * 2);
+      o.style.width = oWidth + 'px';
+      o.style.left = (L + pad) + 'px';
+      o.style.top = (edge === 'n' ? topBase - pad : topBase) + 'px';
+      o.style.height = pad + 'px';
+      // 内側：反対側の枠を超えない
+      i.style.width = W + 'px';
+      i.style.left = L + 'px';
+      i.style.top = (edge === 'n' ? topBase : topBase - dynamicPadH) + 'px';
+      i.style.height = dynamicPadH + 'px';
+    } else {
+      const leftBase = (edge === 'w') ? L : L + W;
+      // 外側：角(pad四方)を空ける
+      const oHeight = Math.max(0, H - pad * 2);
+      o.style.height = oHeight + 'px';
+      o.style.top = (T + pad) + 'px';
+      o.style.left = (edge === 'w' ? leftBase - pad : leftBase) + 'px';
+      o.style.width = pad + 'px';
+      // 内側：反対側の枠を超えない
+      i.style.height = H + 'px';
+      i.style.top = T + 'px';
+      i.style.left = (edge === 'w' ? leftBase : leftBase - dynamicPadW) + 'px';
+      i.style.width = dynamicPadW + 'px';
+    }
+    o.style.zIndex = 20;
+    i.style.zIndex = isHorizontalLong ? ((edge === 'e' || edge === 'w') ? 10 : 5) : ((edge === 'n' || edge === 's') ? 10 : 5);
+  });
+
+  const nr = nCont.getBoundingClientRect(), mr = mCont.getBoundingClientRect();
+  const ns = Math.min(nr.width / img.w, nr.height / img.h);
+  const nx = (nr.width - img.w * ns) / 2, ny = (nr.height - img.h * ns) / 2;
+  navImg.style.transform = `translate(${nx}px,${ny}px) scale(${ns})`;
+  navBox.style.left = (nx + sel.x * ns) + 'px'; navBox.style.top = (ny + sel.y * ns) + 'px';
+  navBox.style.width = (sel.w * ns) + 'px'; navBox.style.height = (sel.h * ns) + 'px';
+
+  let vBox = document.getElementById('view-box');
+  if (!vBox) {
+    vBox = document.createElement('div'); vBox.id = 'view-box';
+    vBox.style.cssText = 'position:absolute;pointer-events:none;box-shadow:0 0 0 4000px rgba(77,163,255,0.3);';
+    nCont.appendChild(vBox);
+  }
+  const vL = -view.x/view.scale, vT = -view.y/view.scale, vW = mr.width/view.scale, vH = mr.height/view.scale;
+  vBox.style.left = (nx + vL * ns) + 'px'; vBox.style.top = (ny + vT * ns) + 'px';
+  vBox.style.width = (vW * ns) + 'px'; vBox.style.height = (vH * ns) + 'px';
+}
+</script>
+</body>
+</html>
