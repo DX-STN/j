@@ -154,7 +154,7 @@ mCont.addEventListener('touchend',()=>{
  }
  touch.mode=''; update();
 });
-
+/*
 function update() {
   if (!img.isLoaded) return;
   const mr = mCont.getBoundingClientRect();
@@ -201,6 +201,95 @@ function update() {
   vBox.style.left = (nx + vL * ns) + 'px'; vBox.style.top = (ny + vT * ns) + 'px';
   vBox.style.width = (vW * ns) + 'px'; vBox.style.height = (vH * ns) + 'px';
 }
+*/
+
+
+function update() {
+  if (!img.isLoaded) return;
+  const mr = mCont.getBoundingClientRect();
+
+  // 1. 操作中かどうかの状態をクラスで管理
+  //（CSS側で .dragging 時は transition: none に設定することを想定）
+  if (touch.mode) {
+    mCont.classList.add('dragging');
+  } else {
+    mCont.classList.remove('dragging');
+  }
+
+  // 2. スケール計算：キャンバスの境界100%に吸い付かせる
+  const maxPixelSize = 40; // 1px=1cm
+  let s = Math.min(mr.width / sel.w, mr.height / sel.h);
+  view.scale = Math.min(s, maxPixelSize);
+  
+  const minS = Math.min(mr.width / img.w, mr.height / img.h);
+  if (view.scale < minS) view.scale = minS;
+
+  // 3. オートセンター（目標座標の算出）
+  // スクロールモード中以外は常に選択範囲の中心を中央へ
+  if (touch.mode !== 'scroll') {
+    view.x = (mr.width / 2) - (sel.x + sel.w / 2) * view.scale;
+    view.y = (mr.height / 2) - (sel.y + sel.h / 2) * view.scale;
+  }
+
+  // 4. 画像と枠の配置
+  // 値を直接代入するだけで、CSSのtransitionによってアニメーションする
+  mainImg.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
+
+  const L = view.x + sel.x * view.scale;
+  const T = view.y + sel.y * view.scale;
+  const W = sel.w * view.scale;
+  const H = sel.h * view.scale;
+
+  cropBox.style.left = L + 'px';
+  cropBox.style.top = T + 'px';
+  cropBox.style.width = W + 'px';
+  cropBox.style.height = H + 'px';
+
+  // 5. ハンドル配置（z-index優先順位を含む）
+  const pad = 50, dPW = Math.min(pad, W), dPH = Math.min(pad, H), isHL = sel.w > sel.h;
+  ['n', 's', 'e', 'w'].forEach(edge => {
+    const o = document.getElementById(`h${edge}_o`), i = document.getElementById(`h${edge}_i`);
+    const b = (edge === 'n' ? T : (edge === 's' ? T + H : (edge === 'w' ? L : L + W)));
+    if (edge === 'n' || edge === 's') {
+      o.style.width = W + 'px'; o.style.left = L + 'px';
+      o.style.top = (edge === 'n' ? b - pad : b) + 'px'; o.style.height = pad + 'px';
+      i.style.width = W + 'px'; i.style.left = L + 'px';
+      i.style.top = (edge === 'n' ? b : b - dPH) + 'px'; i.style.height = dPH + 'px';
+    } else {
+      o.style.height = H + 'px'; o.style.top = T + 'px';
+      o.style.left = (edge === 'w' ? b - pad : b) + 'px'; o.style.width = pad + 'px';
+      i.style.height = H + 'px'; i.style.top = T + 'px';
+      i.style.left = (edge === 'w' ? b : b - dPW) + 'px'; i.style.width = dPW + 'px';
+    }
+    o.style.zIndex = 20;
+    i.style.zIndex = isHL ? ((edge === 'e' || edge === 'w') ? 10 : 5) : ((edge === 'n' || edge === 's') ? 10 : 5);
+  });
+
+  // 6. ナビ更新（ここはアニメーションさせず即座に追従）
+  const nr = nCont.getBoundingClientRect();
+  const ns = Math.min(nr.width / img.w, nr.height / img.h);
+  const nx = (nr.width - img.w * ns) / 2, ny = (nr.height - img.h * ns) / 2;
+  navImg.style.transform = `translate(${nx}px,${ny}px) scale(${ns})`;
+  navBox.style.left = (nx + sel.x * ns) + 'px';
+  navBox.style.top = (ny + sel.y * ns) + 'px';
+  navBox.style.width = (sel.w * ns) + 'px';
+  navBox.style.height = (sel.h * ns) + 'px';
+
+  let vBox = document.getElementById('view-box');
+  if (!vBox) {
+    vBox = document.createElement('div'); vBox.id = 'view-box';
+    vBox.style.cssText = 'position:absolute;pointer-events:none;box-shadow:0 0 0 4000px rgba(77,163,255,0.3);z-index:4;';
+    nCont.appendChild(vBox);
+  }
+  const vL = -view.x / view.scale, vT = -view.y / view.scale, vW = mr.width / view.scale, vH = mr.height / view.scale;
+  vBox.style.left = (nx + vL * ns) + 'px';
+  vBox.style.top = (ny + vT * ns) + 'px';
+  vBox.style.width = (vW * ns) + 'px';
+  vBox.style.height = (vH * ns) + 'px';
+}
+
+
+ 
 </script>
 </body>
 </html>
