@@ -23,6 +23,22 @@ body { margin:0; background:#111; overflow:hidden; display:flex; flex-direction:
 }
 .handle { position:absolute; pointer-events:auto; }
 #file-input { margin: 10px; color: white; }
+
+
+
+/* 既存のスタイルに transition を追加 */
+#main-img, .crop-box, .handle {
+  /* 0.3秒で滑らかに動かす。イージングは好みに合わせて調整可能 */
+  transition: transform 0.3s ease-out, left 0.3s ease-out, top 0.3s ease-out, width 0.3s ease-out, height 0.3s ease-out;
+}
+
+/* 操作中（.draggingクラスが付いている間）はアニメーションを切り、指に直結させる */
+.dragging #main-img, 
+.dragging .crop-box, 
+.dragging .handle {
+  transition: none !important;
+}
+ 
 </style>
 </head>
 <body>
